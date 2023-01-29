@@ -6,7 +6,7 @@ Lurker is currently tested on:
 * Linux
 * macOS
 
-# Commands
+## Commands
 Lurker supports the following commands:
 * sleep - Adjust Lurker's check-in time
 * shell - Run commands on the target
@@ -19,7 +19,7 @@ Lurker supports the following commands:
 
 More commands are under development
 
-# Getting Started
+## Getting Started
 1. Clone the Lurker repo
 2. Run the `keyExtract.py` script in the same directory as the team server's `.cobaltstrike.beacon_keys` file
 3. Copy the RSA public key into the `constants.go`'s `RsaPublicKey` variable
@@ -28,8 +28,8 @@ More commands are under development
 6. Set the `GOOS` and `GOARCH` env variables to determine Lurker's target OS and architecture
 7. In the root directory, `go build main.go`
 
-# Disclaimer
+## Disclaimer
 Lurker is for authorized use and for research purposes only
 
-# Acknowledgement
+## Acknowledgement
 Lurker is refactored from and built on @darkr4y's Geacon project (https://github.com/darkr4y/geacon)
