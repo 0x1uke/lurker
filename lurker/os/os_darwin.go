@@ -42,7 +42,6 @@ func IsProcessX64() bool {
 }
 
 func GetCodePageANSI() []byte {
-	//hardcode for test
 	b := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b, 936)
 	return b

