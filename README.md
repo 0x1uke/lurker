@@ -29,7 +29,7 @@ More commands are under development
 7. In the root directory, `go build main.go`
 
 ## Disclaimer
-Lurker is for authorized use and for research purposes only
+Lurker is for authorized use and research purposes only
 
 ## Acknowledgement
 Lurker is refactored from and built on @darkr4y's Geacon project (https://github.com/darkr4y/geacon)
