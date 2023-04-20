@@ -28,8 +28,8 @@ More commands are under development
 6. Set the `GOOS` and `GOARCH` env variables to determine Lurker's target OS and architecture
 7. In the root directory, `go build main.go`
 
-## Disclaimer
-Lurker is for authorized use and research purposes only
+## Liability
+Lurker is an open source project meant to be used with authorization to assess the security posture and conduct security research.
 
 ## Acknowledgement
 Lurker is refactored from and built on @darkr4y's Geacon project (https://github.com/darkr4y/geacon)
