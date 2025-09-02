@@ -4,43 +4,64 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
+	"strings"
 
 	"lurker/lurker/constants"
-
-	"github.com/imroc/req"
 )
 
 var (
-	httpRequest = req.New()
+	Client *http.Client
 )
 
 func init() {
-	httpRequest.SetTimeout(constants.TimeOut * time.Second)
-	trans, _ := httpRequest.Client().Transport.(*http.Transport)
-	trans.MaxIdleConns = 20
-	trans.TLSHandshakeTimeout = constants.TimeOut * time.Second
-	trans.DisableKeepAlives = true
-	trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: constants.IgnoreSSLCertErrors}
+	proxyFunct := http.ProxyFromEnvironment
+	if constants.UseProxy {
+		proxyURL, err := url.Parse(constants.Proxy)
+		if err == nil {
+			proxyFunct = http.ProxyURL(proxyURL)
+		} else {
+			proxyFunct = http.ProxyFromEnvironment
+		}
+	}
+	tr := &http.Transport{
+		Proxy: proxyFunct,
+		DialContext: (&net.Dialer{
+			Timeout: constants.TimeOut * time.Second,
+			KeepAlive: 0,
+		}).DialContext,
+		MaxIdleConns: 20,
+		IdleConnTimeout: constants.TimeOut * time.Second, 
+		DisableKeepAlives: true, 
+		TLSHandshakeTimeout: constants.TimeOut * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: constants.VerifySSLCert,
+		},
+	}
+	
+	Client = &http.Client{
+		Transport: tr,
+		Timeout: constants.TimeOut * time.Second,
+	}
 }
 
 func HttpPost(url string, clientID string, data []byte) *req.Resp {
 	for {
-		if constants.UseProxy {
-			httpRequest.SetProxyUrl(constants.Proxy)
-		}
-		httpHeaders := req.Header{
-			"User-Agent": constants.UserAgent,
-			"Cookie":     base64.RawURLEncoding.EncodeToString([]byte(clientID)),
-		}
-		resp, err := httpRequest.Post(url, base64.URLEncoding.EncodeToString([]byte(data)), httpHeaders)
+		webreq, err := http.NewRequest("POST", url, strings.NewReader(base64.URLEncoding.EncodeToString([]byte(data))))
+		webreq.Header.Set("User-Agent", constants.UserAgent)
+		webreq.Header.Set("Cookie", base64.RawURLEncoding.EncodeToString([]byte(clientID)))
+		resp, err := Client.Do(webreq)
+
 		if err != nil {
 			fmt.Printf("!error: %v\n", err)
 			time.Sleep(constants.SleepTime)
 			continue
 		} else {
-			if resp.Response().StatusCode == http.StatusOK {
+			if resp.StatusCode == http.StatusOK {
 				return resp
 			}
 			break
@@ -51,21 +72,18 @@ func HttpPost(url string, clientID string, data []byte) *req.Resp {
 }
 
 func HttpGet(url string, cookies string) *req.Resp {
-	httpHeaders := req.Header{
-		"User-Agent": constants.UserAgent,
-		"Cookie":     cookies,
-	}
 	for {
-		if constants.UseProxy {
-			httpRequest.SetProxyUrl(constants.Proxy)
-		}
-		resp, err := httpRequest.Get(url, httpHeaders)
+		webreq, err := http.NewRequest("GET", url, nil)
+		webreq.Header.Set("User-Agent", constants.UserAgent)
+		webreq.Header.Set("Cookie", cookies)
+		resp, err := Client.Do(webreq)
+
 		if err != nil {
 			fmt.Printf("!error: %v\n", err)
 			time.Sleep(constants.SleepTime)
 			continue
 		} else {
-			if resp.Response().StatusCode == http.StatusOK {
+			if resp.StatusCode == http.StatusOK {
 				return resp
 			}
 			break
