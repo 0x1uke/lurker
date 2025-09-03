@@ -1,9 +1,6 @@
 # Lurker
 Lurker is a cross-platform, companion implant to Cobalt Strike built with Go
 
-* **WARNING: the imroc/req HTTP client currently has a HIGH severity vulnerability, CVE-2024-45258.**
-* This module will be replaced at some point, but use at your own risk.
-
 Lurker is currently tested on:
 * Windows
 * Linux
