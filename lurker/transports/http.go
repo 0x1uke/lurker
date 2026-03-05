@@ -39,7 +39,7 @@ func init() {
 		TLSHandshakeTimeout: constants.TimeOut * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: constants.VerifySSLCert,
+			InsecureSkipVerify: constants.IgnoreSSLCertErrors,
 		},
 	}
 	
