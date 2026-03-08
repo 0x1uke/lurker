@@ -42,10 +42,10 @@ func GetOSVersion() string {
 
 func IsHighPriv() bool {
 	fd, err := os.Open("/root")
-	defer fd.Close()
 	if err != nil {
 		return false
 	}
+	fd.Close()
 	return true
 }
 
@@ -59,30 +59,27 @@ func IsOSX64() bool {
 
 func IsProcessX64() bool {
 	if runtime.GOARCH == "amd64" {
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func GetCodePageANSI() []byte {
-	//hardcode for test
 	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, 936)
+	binary.LittleEndian.PutUint16(b, 1252)
 	return b
 }
 
 func GetCodePageOEM() []byte {
-	//hardcode for test
 	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, 936)
+	binary.LittleEndian.PutUint16(b, 437)
 	return b
 }
 
 func GetUsername() string {
 	user, err := user.Current()
 	if err != nil {
-		return ""
+		return "?"
 	}
-	usr := user.Username
-	return usr
+	return user.Username
 }
