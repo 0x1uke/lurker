@@ -71,6 +71,49 @@ func ParseCommandShell(b []byte) (string, []byte) {
 	return app, cmd
 }
 
+// splitArgs splits a command string into tokens, respecting
+// double-quoted and single-quoted substrings.
+func splitArgs(s string) []string {
+	var args []string
+	var current strings.Builder
+	inDouble := false
+	inSingle := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '"' && !inSingle:
+			inDouble = !inDouble
+		case c == '\'' && !inDouble:
+			inSingle = !inSingle
+		case c == ' ' && !inDouble && !inSingle:
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteByte(c)
+		}
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args
+}
+
+// Run executes a process directly without a shell wrapper.
+// The command string is tokenized: first token is the executable
+// (resolved via PATH), remaining tokens are arguments.
+func Run(command string) ([]byte, error) {
+	tokens := splitArgs(strings.TrimSpace(command))
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("empty command")
+	}
+	cmd := exec.Command(tokens[0], tokens[1:]...)
+	out, err := cmd.CombinedOutput()
+	return out, err
+}
+
 func Shell(path string, args []byte) []byte {
 	switch runtime.GOOS {
 	case "windows":
