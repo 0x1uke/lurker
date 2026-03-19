@@ -60,7 +60,7 @@ func IsHighPriv() bool {
 	token, err := syscall.OpenCurrentProcessToken()
 	defer token.Close()
 	if err != nil {
-		fmt.Printf("open current process token failed: %v\n", err)
+		// fmt.Printf("open current process token failed: %v\n", err)
 		return false
 	}
 	/*

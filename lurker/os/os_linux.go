@@ -2,7 +2,7 @@ package os
 
 import (
 	"encoding/binary"
-	"fmt"
+	// "fmt"
 	"os"
 	"os/user"
 	"runtime"
@@ -25,7 +25,7 @@ func arrayToString(x [65]int8) string {
 func getUname() syscall.Utsname {
 	var uname syscall.Utsname
 	if err := syscall.Uname(&uname); err != nil {
-		fmt.Printf("Uname: %v", err)
+		// fmt.Printf("Uname: %v", err)
 		return syscall.Utsname{} //nil
 	}
 	return uname
@@ -41,27 +41,17 @@ func GetOSVersion() string {
 }
 
 func IsHighPriv() bool {
-	fd, err := os.Open("/root")
-	if err != nil {
-		return false
-	}
-	fd.Close()
-	return true
+	return os.Geteuid() == 0
 }
 
 func IsOSX64() bool {
 	uname := getUname()
-	if arrayToString(uname.Machine) == "x86_64" {
-		return true
-	}
-	return false
+	machine := arrayToString(uname.Machine)
+	return machine == "x86_64" || machine == "aarch64"
 }
 
 func IsProcessX64() bool {
-	if runtime.GOARCH == "amd64" {
-		return true
-	}
-	return false
+	return runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64"
 }
 
 func GetCodePageANSI() []byte {

