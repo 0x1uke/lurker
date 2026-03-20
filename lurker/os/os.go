@@ -52,10 +52,17 @@ func GetComputerName() string {
 	if err != nil || sHostName == "" {
 		sHostName = "?"
 	}
-	if runtime.GOOS == "linux" {
-		sHostName = sHostName + " (Linux)"
-	} else if runtime.GOOS == "darwin" {
-		sHostName = sHostName + " (Darwin)"
+	switch runtime.GOOS {
+	case "linux":
+		sHostName += " (Linux)"
+	case "darwin":
+		sHostName += " (Darwin)"
+	case "freebsd":
+		sHostName += " (FreeBSD)"
+	case "solaris":
+		sHostName += " (Solaris)"
+	case "windows":
+		sHostName += " (Windows)"
 	}
 	return sHostName
 }
