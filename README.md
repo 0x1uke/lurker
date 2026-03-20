@@ -5,11 +5,14 @@ Lurker is currently tested on:
 * Windows
 * Linux
 * macOS
+* FreeBSD
+* Solaris
 
 ## Commands
 Lurker supports the following commands:
 * sleep - Adjust Lurker's check-in time
-* shell - Run commands on the target
+* shell - Run commands on the target utilizing system shell
+* run - Run executables on the target
 * upload - Upload files to a target machine
 * download - Download files from a target machine
 * exit - Terminate Lurker's process

