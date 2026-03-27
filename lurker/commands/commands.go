@@ -28,6 +28,8 @@ const (
 	CMD_TYPE_FILE_BROWSE  = 53
 	CMD_TYPE_UPLOAD_LOOP  = 67
 	CMD_TYPE_SHELL        = 78
+	CMD_TYPE_UDP_ASSOCIATE = 103
+	CMD_TYPE_UDP_SEND      = 104
 )
 
 // Callback type constants (agent → teamserver)
